@@ -1,0 +1,500 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
+
+  <title>Win/Loss Counters</title>
+
+  <!-- Bootstrap core CSS -->
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" rel="stylesheet">
+  <script
+  src="https://code.jquery.com/jquery-3.4.1.min.js"
+  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+  crossorigin="anonymous"></script>
+  <script
+  src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"
+  integrity="sha256-VazP97ZCwtekAsvgPBSUwPFKdrwD3unUfSGVYrahUqU="
+  crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-cookie@2/src/js.cookie.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.bundle.min.js"></script>
+  <style>
+    main {
+      padding-top: 5px;
+      padding-left: 15px;
+      width: 320px;
+    }
+    .win-loss-span {
+      font-weight: bold;
+      font-size: 1em;
+    }
+    .counter {
+      text-align: center;
+      border: 1px solid black;
+      padding: 5px;
+      margin: 0 5px 5px;
+    }
+    .counter p, .counter h5 {
+      margin-bottom: 0 !important;
+    }
+    .counter button {
+      margin: 5px;
+    }
+    .close-counter {
+      margin-right: 5px;
+      color: black;
+    }
+
+    .counter .form-check-inline {
+      font-size: .8em;
+    }
+    * {
+      box-sizing: border-box;
+    }
+
+    .sidebar-toggle, .sidebar-item {
+       position: fixed;
+       z-index: 1;
+       outline: none;
+       margin-left: 20.25em;
+       margin-top: 0px;
+       cursor: pointer;
+       transition: 0.2s;
+    }
+    .sidebar-item {
+      margin-top: 25px;
+    }
+     .sidebar-toggle.is-closed, .sidebar-item.is-closed {
+       transform: translateX(0.3em) rotate(0deg);
+       margin-left: 0em;
+    }
+    }
+     .sidebar-toggle .icon, .sidebar-item .icon {
+       font-size: 1rem;
+       color: #000;
+    }
+     .sidebar {
+       width: 20em;
+       height: 100vh;
+       background-color: #fff;
+       transition: 0.2s;
+       /**border-right: 1px solid black;**/
+       position: absolute;
+    }
+     .sidebar.is-closed {
+       transform: translateX(-20em);
+    }
+
+    .sidebar .container {
+      margin: 10px;
+    }
+
+    #decks {
+      overflow-y: scroll;
+      height: 500px;
+      padding-left: 0 5px;
+    }
+    .deck:nth-child(even) {
+      background-color: #f5f5f5;
+    }
+
+    .add-deck-div, .event-label, .entry-fee {
+      margin-top: 8px !important;
+    }
+
+    .add-deck-div {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .event-label, .entry-fee, .add-deck-div {
+      text-align: right;
+    }
+
+    .add-deck-counter, .close-counter, .remove-deck, .plus{
+      float: right;
+    }
+    .add-deck-counter{
+      margin-right: 10px;
+    }
+    .deck {
+      clear: both;
+    }
+
+    .form-check-label {
+      margin: 3px 5px 0 0;
+    }
+    #counters {
+      height: 485px;
+      overflow-y: scroll;
+
+    }
+    a {
+      cursor: pointer;
+    }
+    sup {
+      top: -0.8em;
+      font-size: x-small;
+    }
+    li {
+      padding-left: 5px;
+    }
+
+    .form-check {
+      padding-left: 2.25rem !important;
+    }
+    .net-record {
+      margin-left: 5px;
+    }
+    .loss-record {
+      color: red;
+    }
+    .win-record {
+      color: green;
+    }
+
+    h5 {
+      font-size: .9em;
+    }
+
+    .counter p {
+      font-size: .8em;
+    }
+  </style>
+<script src="https://use.fontawesome.com/d2b8364476.js"></script>
+<script>
+  var stored = window.localStorage.getItem('decks');
+  var decks = stored != null ? JSON.parse(stored) : [];
+  var actions = [];
+  var used = [];
+  var event_log = [];
+  var counterNumber = 0;
+
+  var buildCounter = function(deck){
+    var code = getCode(deck) + counterNumber++;
+    var counter = buildCounterStructure(code);
+    counter.append(closeCounterLink(code))
+    counter.append(counterTitle(deck))
+    counter.append(winLossRow(code))
+    counter.append(rankedOrPlayedSelector(code))
+    counter.append(winLossButtons(code))
+    $('#counters').append(counter);
+    $('.sidebar-toggle').click();
+    $('#event').prop('checked',false);
+    //updateCosts(code);
+  };
+
+  var winLossButtons = function(code){
+    var btn_row = $('<div class=""></div>');
+    var win = $('<button class="btn btn-success btn-sm">Win</button>');
+    btn_row.append(win);
+    var loss = $('<button class="btn btn-danger btn-sm">Loss</button>');
+    btn_row.append(loss);
+    return btn_row;
+  };
+
+  var getCode = function(name){
+    name = name.toLowerCase().replace(/[^\w]/g,'_');
+    return name;
+  };
+
+  var rankedOrPlayedSelector = function(code){
+    var form = $('<div class="form-check-inline"></div>');
+    form.append($('<label class="form-check-label"><input type="radio" class="form-check-input" name="' + code + '-game-type" value="ranked"/>Ranked</label>'));
+    form.append($('<label class="form-check-label"><input type="radio" class="form-check-input" name="' + code + '-game-type" value="play" checked/>Play</label>'));
+    return form
+  };
+
+  var winLossRow = function(code){
+    var win_row = $('<div class="win-loss-row"></div>');
+    win_row.append($('<span class="win-loss-span win-loss" id="' + code +
+      '-win">0</span> <span class="win-loss-span">-</span> <span class="win-loss-span win-loss" id="' + code +
+      '-loss">0</span>'));
+    win_row.append($('<p>Percentage: <span id="' + code + '-percentage" class="percentage">0.00</span>%</p>'));
+    win_row.append($('<p>Total Games: <span id="' + code + '-total" class="total">0</span><span class="net-record" id="' + code + '-net-record">(0)</span></p>'));
+    return win_row;
+  };
+
+  var buildCounterStructure = function(code){
+    return $('<div id="' + code + '" class="win-loss-counter counter"></div>' );
+  };
+
+  var counterTitle = function(deck) {
+    return $('<h5>' + deck + '</h5>')
+  };
+
+  var closeCounterLink = function(code) {
+    return $('<a  class="close-counter" data-target="' + code + '">X</a>')
+  };
+
+  var addSidebarToggle = function(doc) {
+    doc.on('click', '.sidebar-toggle', function(){
+      $(this).toggleClass('is-closed')
+      $('.sidebar').toggleClass('is-closed')
+      $('.sidebar-item').toggleClass('is-closed')
+      $('.sidebar-toggle i').toggleClass('fa-minus fa-plus')
+    })
+  }
+
+  var getNewDeckName = function(){
+    var name = $('#deck-name').val()
+    $('#deck-name').val('')
+    if ( ! name ){
+      name = ''
+    }
+    return name
+  };
+
+  var addToDecksListing = function(name) {
+    if (!decks.includes(name)){
+      decks.push(name);
+      decks = decks.sort();
+      buildDeckListing(name);
+      window.localStorage.setItem('decks',JSON.stringify(decks));
+    }
+  }
+
+  var createDeckListingStructure = function(){
+    return $('<div class="deck"></div>')
+  }
+
+  var removeListingLink = function() {
+    return $('<a class="remove-deck">-</a>')
+  }
+
+  var buildDeckCounterLink = function(name) {
+    return $('<a class="add-deck-counter" id="add-deck-counter-' + getCode(name) + '">+</a>');
+  }
+
+  var deckListingTitle = function(name) {
+    return $('<h5>' + name + '</h5>')
+  }
+
+  var buildDeckListing = function(name){
+    var deck = createDeckListingStructure()
+    deck.append(removeListingLink())
+    deck.append(buildDeckCounterLink(name))
+    deck.append(deckListingTitle(name))
+    $('#decks').append(deck)
+  }
+
+  var addDeckListingActions = function(doc){
+    doc.on('click','a.remove-deck', function(e){
+      removeDeckListing($(e.target))
+    })
+    doc.on('click','a.add-deck-counter',function(e){
+      buildDeckCounter($(e.target))
+    })
+  }
+
+  var buildDeckCounter = function(target){
+    var name = target.siblings('h5').text();
+    buildCounter(name);
+  }
+
+  var removeDeckListing = function(target){
+    var name = target.siblings('h5').text();
+    target.parent().detach();
+    decks = decks.filter(v => v != name );
+    window.localStorage.setItem('decks',JSON.stringify(decks));
+  }
+
+  var addDeckCounter = function(name){
+    $('#add-deck-counter-' + getCode(name)).click();
+  }
+
+  var addAddDeckAction = function(doc) {
+    doc.on('click', '#add-deck', function(){
+      var name = getNewDeckName();
+      if ( name == '' ) {
+        return;
+      }
+      addToDecksListing(name)
+      addDeckCounter(name)
+    })
+  }
+
+  var buildFullDeckListing = function() {
+    for ( var x=0; x < decks.length; x++) {
+      buildDeckListing(decks[x])
+    }
+  }
+
+  var addCounterCloseAction = function(doc){
+    doc.on('click','.close-counter', function(e){
+      closeCounter($(e.target))
+    })
+  }
+
+  var closeCounter = function(target) {
+    target.parent().detach()
+  }
+
+  var addCounterWinAction = function(doc) {
+    doc.on('click', '.counter .btn-success', function(e){
+      recordWin($(e.target))
+    })
+    doc.on('click', '.counter .btn-danger', function(e){
+      recordLoss($(e.target))
+    })
+  }
+
+  var recordGame = function(target,win) {
+    var counterId = targetCounterId(target)
+    var ranked = targetRanked(target)
+    updateCounter(counterId,win,ranked,true)
+    actions.push([counterId,win,ranked])
+  }
+
+  var recordWin = function(target) {
+    recordGame(target,true)
+  }
+
+  var recordLoss = function(target) {
+    recordGame(target,false)
+  }
+
+
+
+  var updateCounter = function(counterId,win,ranked,forward) {
+    performCounterUpdate(counterId,win,forward);
+    performCounterUpdate('all',win,forward);
+    performCounterUpdate('all-' + (ranked ? 'ranked' : 'play'),win,forward);
+  }
+
+  var counterWins = function(counterId){
+    return parseInt($('#' + counterId + '-win').text())
+  }
+
+  var counterLosses = function(counterId){
+    return parseInt($('#' + counterId + '-loss').text())
+  }
+
+  var targetCounterId = function(target) {
+    return target.parent().parent().prop('id')
+  }
+
+  var targetRanked = function(target) {
+    return $('#' + targetCounterId(target) + ' input[type=radio]:checked').val() === 'ranked'
+  }
+
+  var performCounterUpdate = function(code,win,forward){
+    updateValue('#' + code + (win ? '-win' : '-loss'), (forward ? 1 : -1))
+    var wins = parseInt($('#' + code + '-win').text());
+    var losses = parseInt($('#' + code + '-loss').text());
+    var total = wins + losses;
+    var net = wins - losses;
+    var net_record = $('#' + code + '-net-record');
+    net_record.removeClass('loss-record win-record');
+    setValue(net_record,'('+net+')');
+    if (net < 0){
+      net_record.addClass('loss-record');
+      setValue(net_record,'('+net+')');
+    } else if ( net > 0 ){
+      net_record.addClass('win-record');
+      setValue(net_record,'(+'+net+')');
+    }
+    setValue('#' + code + '-total',total);
+    var percentage = total == 0 ? '0.00' : (wins / parseFloat(total) * 100).toFixed(2);
+    setValue('#' + code + '-percentage',percentage);
+  }
+
+  var updateValue = function(selector,amount){
+    var value = parseInt($(selector).text()) + amount
+    setValue(selector,value);
+  }
+
+  var setValue = function(selector,value) {
+    $(selector).text(value);
+  };
+
+  var addCounterActions = function(doc){
+    addCounterCloseAction(doc)
+    addCounterWinAction(doc)
+  }
+
+  var addUndo = function(doc){
+    doc.on('click', '.fa-undo', function(){
+      const action = actions.pop()
+      updateCounter(action[0],action[1],action[2],false)
+    })
+  }
+
+  var addEnterKeypress = function(doc){
+  	doc.on('keypress',function(e){
+	  if (e.which == 13){
+	    $('#add-deck').click();
+	  }
+  });
+  }
+
+  $(document).ready( function() {
+    const doc = $(document)
+    addSidebarToggle(doc)
+    addAddDeckAction(doc)
+    buildFullDeckListing()
+    addDeckListingActions(doc)
+    addCounterActions(doc)
+    addUndo(doc)
+    addEnterKeypress(doc)
+  })
+</script>
+</head>
+<body>
+<div class="sidebar is-closed">
+  <a class="sidebar-toggle"><i class="fa fa-plus icon"></i></a>
+  <a class="sidebar-item"><i class="fa fa-undo icon"></i></a>
+  <div class="container">
+    <div class="form-group row">
+      <div class="col-4 add-deck-div">Name</div>
+      <div class="col-8">
+        <input type="text" class="form-control" id="deck-name"/>
+      </div>
+    </div>
+    <div class="form-group row">
+      <div class="add-deck-div"><a id="add-deck">Add Deck</a></div>
+    </div>
+    <div id="decks"></div>
+  </div>
+</div>
+<main class="page-content">
+  <div id="summary-div">
+    <div class="summary-counter counter">
+      <h5>All-Day All Games</h5>
+      <div class="win-loss-row">
+        <span class="win-loss-span win-loss" id="all-win">0</span>
+        <span class="win-loss-span">-</span>
+        <span class="win-loss-span win-loss" id="all-loss">0</span>
+      </div>
+      <p>Percentage: <span id="all-percentage" class="percentage">0.00</span>%</p>
+      <p>Total Games: <span id="all-total" class="total">0</span><span class="net-record" id="all-net-record">(0)</span></p>
+    </div>
+    <div class="summary-counter counter">
+      <h5>All-Day All Ranked</h5>
+      <div class="win-loss-row">
+        <span class="win-loss-span win-loss" id="all-ranked-win">0</span>
+        <span class="win-loss-span">-</span>
+        <span class="win-loss-span win-loss" id="all-ranked-loss">0</span>
+      </div>
+      <p>Percentage: <span id="all-ranked-percentage" class="percentage">0.00</span>%</p>
+      <p>Total Games: <span id="all-ranked-total" class="total">0</span><span class="net-record" id="all-ranked-net-record">(0)</span></p>
+    </div>
+    <div class="summary-counter counter">
+      <h5>All-Day All Play</h5>
+      <div class="win-loss-row">
+        <span class="win-loss-span win-loss" id="all-play-win">0</span>
+        <span class="win-loss-span">-</span>
+        <span class="win-loss-span win-loss" id="all-play-loss">0</span>
+      </div>
+      <p>Percentage: <span id="all-play-percentage" class="percentage">0.00</span>%</p>
+      <p>Total Games: <span id="all-play-total" class="total">0</span><span class="net-record" id="all-play-net-record">(0)</span></p>
+    </div>
+  </div>
+  <div id="counters"></div>
+</main>
+
+</body>
+</html>
